@@ -1,0 +1,100 @@
+pipeline {
+    agent any
+
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
+
+    stages {
+        stage('Check project files') {
+            steps {
+                sh '''#!/bin/bash
+set -euo pipefail
+
+test -f index.html
+test -f style.css
+test -f script.js
+test -f dockerfile
+
+echo "Required files are present."
+'''
+            }
+        }
+
+        stage('Deploy to AWS EC2') {
+            steps {
+                sshagent(credentials: ['ec2-ssh-key']) {
+                    sh '''#!/bin/bash
+set -euo pipefail
+
+REMOTE="ec2-user@16.60.185.90"
+
+ARCHIVE=$(mktemp /tmp/website-deploy-XXXXXX.tar.gz)
+trap 'rm -f "$ARCHIVE"' EXIT
+
+# Package the committed project files.
+git archive --format=tar HEAD | gzip > "$ARCHIVE"
+
+# Create a temporary folder on EC2.
+REMOTE_DIR=$(ssh \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "$REMOTE" \
+  'mktemp -d /home/ec2-user/website-deploy-XXXXXX')
+
+# Copy the package to EC2.
+scp \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "$ARCHIVE" "$REMOTE:$REMOTE_DIR/source.tar.gz"
+
+# Build and run the Docker container on EC2.
+ssh \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "$REMOTE" \
+  bash -s -- "$REMOTE_DIR" "$BUILD_NUMBER" <<'REMOTE_SCRIPT'
+set -euo pipefail
+
+DEPLOY_DIR="$1"
+BUILD_ID="$2"
+IMAGE="tic-tac-toe:$BUILD_ID"
+
+cd "$DEPLOY_DIR"
+tar -xzf source.tar.gz
+
+docker build -t "$IMAGE" .
+
+# Remove the manual test container if you started it earlier.
+docker rm -f tictac-web-manual 2>/dev/null || true
+
+# Remove the previous Pipeline container if it exists.
+docker rm -f my-website 2>/dev/null || true
+
+# Start this build's website.
+docker run -d \
+  --name my-website \
+  --restart unless-stopped \
+  -p 80:80 \
+  "$IMAGE"
+
+# Check that Nginx serves the website.
+for attempt in $(seq 1 15); do
+  if curl --fail --silent --output /dev/null http://localhost/; then
+    echo "Website deployed successfully."
+    docker ps --filter name=my-website
+    exit 0
+  fi
+  sleep 2
+done
+
+echo "Website did not respond. Container logs:"
+docker logs --tail 100 my-website
+exit 1
+REMOTE_SCRIPT
+'''
+                }
+            }
+        }
+    }
+}
