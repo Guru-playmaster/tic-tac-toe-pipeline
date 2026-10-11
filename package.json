@@ -1,0 +1,17 @@
+{
+  "name": "tic-tac-toe-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Room-based online Tic-Tac-Toe",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

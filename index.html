@@ -9,8 +9,30 @@
 <body>
   <main class="game">
     <h1>Tic-Tac-Toe</h1>
-    <p class="subtitle">A little game for two players</p>
-    <p class="status" id="status" aria-live="polite">Player X's turn</p>
+    <p class="subtitle">Play online with someone anywhere</p>
+    <p class="status" id="status" aria-live="polite">Create a room or join with a room code.</p>
+
+    <section class="lobby" id="lobby" aria-label="Online game setup">
+      <label for="server-url">Game server URL</label>
+      <input id="server-url" type="url" autocomplete="url" placeholder="https://game-server.example.com">
+      <p class="field-help">Both players must use the same game server.</p>
+      <button class="action" id="create-room" type="button">Create room</button>
+      <div class="join-row">
+        <label class="visually-hidden" for="room-input">Room code</label>
+        <input id="room-input" type="text" inputmode="text" maxlength="6" autocomplete="off" placeholder="ROOM CODE">
+        <button class="action" id="join-room" type="button">Join room</button>
+      </div>
+    </section>
+
+    <section class="room" id="room" aria-label="Online game room" hidden>
+      <div class="room-heading">
+        <p>Room <strong id="room-code"></strong></p>
+        <button class="small-action" id="copy-invite" type="button">Copy invite</button>
+      </div>
+      <p class="player-info" id="player-info"></p>
+      <button class="small-action reconnect" id="reconnect" type="button" hidden>Reconnect</button>
+    </section>
+
     <section class="board" id="board" aria-label="Tic-Tac-Toe board">
       <button class="cell" type="button" aria-label="Row 1, column 1"></button>
       <button class="cell" type="button" aria-label="Row 1, column 2"></button>
@@ -22,10 +44,10 @@
       <button class="cell" type="button" aria-label="Row 3, column 2"></button>
       <button class="cell" type="button" aria-label="Row 3, column 3"></button>
     </section>
-    <button class="reset" id="reset" type="button">New game</button>
-    <p class="help">Take turns clicking an empty square.</p>
+    <button class="reset" id="reset" type="button" hidden>Play again</button>
+    <p class="help">Share the invite link, or open this page on another origin and enter the same server URL and room code.</p>
   </main>
 
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

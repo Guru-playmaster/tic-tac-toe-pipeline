@@ -14,6 +14,10 @@ set -euo pipefail
 test -f index.html
 test -f style.css
 test -f script.js
+test -f server.js
+test -f package.json
+test -f package-lock.json
+test -d test
 test -f dockerfile
 
 echo "Required files are present."
@@ -75,12 +79,13 @@ docker rm -f my-website 2>/dev/null || true
 docker run -d \
   --name my-website \
   --restart unless-stopped \
+  -e "ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://16.60.185.90}" \
   -p 80:80 \
   "$IMAGE"
 
-# Check that Nginx serves the website.
+# Check that the game server is ready.
 for attempt in $(seq 1 15); do
-  if curl --fail --silent --output /dev/null http://localhost/; then
+  if curl --fail --silent --output /dev/null http://localhost/healthz; then
     echo "Website deployed successfully."
     docker ps --filter name=my-website
     exit 0
