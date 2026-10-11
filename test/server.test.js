@@ -138,6 +138,8 @@ test("rooms synchronize players, validate turns, detect wins, and reset", async 
   }
   assert.equal(finalXState.winner, "X");
   assert.equal(finalOState.winner, "X");
+  assert.deepEqual(finalXState.winningLine, [0, 1, 2]);
+  assert.deepEqual(finalOState.winningLine, [0, 1, 2]);
   assert.equal(finalXState.gameOver, true);
 
   const resetXState = waitForMessage(xPlayer, message => message.type === "state");
@@ -149,6 +151,8 @@ test("rooms synchronize players, validate turns, detect wins, and reset", async 
   const [xReset, oReset] = await Promise.all([resetXState, resetOState]);
   assert.deepEqual(xReset.board, Array(9).fill(""));
   assert.deepEqual(oReset.board, Array(9).fill(""));
+  assert.equal(xReset.winningLine, null);
+  assert.equal(oReset.winningLine, null);
   assert.equal(xReset.currentPlayer, "X");
 
   const secondRoundMoves = [
@@ -167,6 +171,8 @@ test("rooms synchronize players, validate turns, detect wins, and reset", async 
   }
   assert.equal(finalXState.winner, "O");
   assert.equal(finalOState.winner, "O");
+  assert.deepEqual(finalXState.winningLine, [3, 4, 5]);
+  assert.deepEqual(finalOState.winningLine, [3, 4, 5]);
 
   const winnerStartsXState = waitForMessage(xPlayer, message => message.type === "state");
   const winnerStartsOState = sendAndWait(
@@ -270,6 +276,8 @@ test("alternates the starting player after a draw", async t => {
   }
   assert.equal(finalXState.gameOver, true);
   assert.equal(finalXState.winner, null);
+  assert.equal(finalXState.winningLine, null);
+  assert.equal(finalOState.winningLine, null);
 
   const nextXState = waitForMessage(xPlayer, message => message.type === "state");
   const nextOState = sendAndWait(

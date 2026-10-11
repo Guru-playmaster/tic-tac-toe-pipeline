@@ -2,7 +2,7 @@
 
 Players can join the same six-character room from separate browsers or origins. The Node.js server serves the page and owns the room state; moves are shared over WebSockets and checked by the server.
 
-After a win, the winner starts the next round. After a draw, the starting player alternates.
+After a win, the winning three squares are highlighted and the winner starts the next round. After a draw, the starting player alternates.
 
 ## Run locally
 

@@ -188,9 +188,10 @@ function createGameServer(options = {}) {
         }
 
         room.board[message.index] = player.mark;
-        room.winner = WINNING_LINES.some(line =>
+        room.winningLine = WINNING_LINES.find(line =>
           line.every(index => room.board[index] === player.mark)
-        ) ? player.mark : null;
+        ) || null;
+        room.winner = room.winningLine ? player.mark : null;
         room.gameOver = Boolean(room.winner) || room.board.every(Boolean);
         if (!room.gameOver) {
           room.currentPlayer = player.mark === "X" ? "O" : "X";
@@ -209,6 +210,7 @@ function createGameServer(options = {}) {
         room.board = Array(9).fill("");
         room.currentPlayer = room.startingPlayer;
         room.winner = null;
+        room.winningLine = null;
         room.gameOver = false;
         broadcastState(room);
         return;
@@ -264,6 +266,7 @@ function createRoom(rooms) {
     currentPlayer: "X",
     startingPlayer: "X",
     winner: null,
+    winningLine: null,
     gameOver: false,
     players: new Map(),
     updatedAt: Date.now()
@@ -287,6 +290,7 @@ function sendState(room, player) {
     board: room.board,
     currentPlayer: room.currentPlayer,
     winner: room.winner,
+    winningLine: room.winningLine,
     gameOver: room.gameOver,
     players: Object.fromEntries(
       ["X", "O"].map(mark => [

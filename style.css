@@ -143,6 +143,12 @@
     .cell:focus-visible, .reset:focus-visible { outline: 3px solid #8c9dff; outline-offset: 3px; }
     .cell.x { color: #8da0ff; }
     .cell.o { color: #ffbd79; }
+    .cell.winning {
+      border-color: #7df0b2;
+      background: #39bd82;
+      color: #102b22;
+      box-shadow: 0 0 0 3px #7df0b2, 0 0 22px #39bd8299;
+    }
     .cell:disabled { cursor: default; }
 
     .reset {

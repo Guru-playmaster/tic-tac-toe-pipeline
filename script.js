@@ -203,9 +203,10 @@
       cell.textContent = mark;
       cell.classList.toggle("x", mark === "X");
       cell.classList.toggle("o", mark === "O");
+      cell.classList.toggle("winning", state.winningLine?.includes(index) || false);
       cell.setAttribute(
         "aria-label",
-        `Row ${Math.floor(index / 3) + 1}, column ${(index % 3) + 1}${mark ? `, ${mark}` : ""}`
+        `Row ${Math.floor(index / 3) + 1}, column ${(index % 3) + 1}${mark ? `, ${mark}` : ""}${state.winningLine?.includes(index) ? ", part of winning line" : ""}`
       );
       cell.disabled =
         !connected ||
