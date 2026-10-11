@@ -114,6 +114,13 @@ test("rooms synchronize players, validate turns, detect wins, and reset", async 
   );
   assert.match(outOfTurn.message, /other player's turn/);
 
+  const earlyReset = await sendAndWait(
+    xPlayer,
+    { type: "reset" },
+    message => message.type === "error"
+  );
+  assert.match(earlyReset.message, /Finish the current game/);
+
   const moves = [
     [xPlayer, 0],
     [oPlayer, 3],
@@ -143,6 +150,36 @@ test("rooms synchronize players, validate turns, detect wins, and reset", async 
   assert.deepEqual(xReset.board, Array(9).fill(""));
   assert.deepEqual(oReset.board, Array(9).fill(""));
   assert.equal(xReset.currentPlayer, "X");
+
+  const secondRoundMoves = [
+    [xPlayer, 0],
+    [oPlayer, 3],
+    [xPlayer, 1],
+    [oPlayer, 4],
+    [xPlayer, 8],
+    [oPlayer, 5]
+  ];
+  for (const [client, index] of secondRoundMoves) {
+    const xState = waitForMessage(xPlayer, message => message.type === "state");
+    const oState = waitForMessage(oPlayer, message => message.type === "state");
+    client.send(JSON.stringify({ type: "move", index }));
+    [finalXState, finalOState] = await Promise.all([xState, oState]);
+  }
+  assert.equal(finalXState.winner, "O");
+  assert.equal(finalOState.winner, "O");
+
+  const winnerStartsXState = waitForMessage(xPlayer, message => message.type === "state");
+  const winnerStartsOState = sendAndWait(
+    oPlayer,
+    { type: "reset" },
+    message => message.type === "state"
+  );
+  const [xWinnerStarts, oWinnerStarts] = await Promise.all([
+    winnerStartsXState,
+    winnerStartsOState
+  ]);
+  assert.equal(xWinnerStarts.currentPlayer, "O");
+  assert.equal(oWinnerStarts.currentPlayer, "O");
 
   const oDisconnected = waitForMessage(
     xPlayer,
@@ -184,4 +221,63 @@ test("rejects WebSocket connections from origins outside the configured allowlis
   });
   await once(allowed, "open");
   allowed.terminate();
+});
+
+test("alternates the starting player after a draw", async t => {
+  const gameServer = createGameServer();
+  const clients = new Set();
+  gameServer.server.listen(0, "127.0.0.1");
+  await once(gameServer.server, "listening");
+
+  const websocketUrl = `ws://127.0.0.1:${gameServer.server.address().port}/ws`;
+  t.after(async () => {
+    clearInterval(gameServer.cleanupTimer);
+    for (const client of clients) client.terminate();
+    await new Promise(resolve => gameServer.server.close(resolve));
+  });
+
+  const xPlayer = await connect(websocketUrl);
+  clients.add(xPlayer);
+  const created = await sendAndWait(
+    xPlayer,
+    { type: "create", token: crypto.randomUUID() },
+    message => message.type === "state"
+  );
+
+  const oPlayer = await connect(websocketUrl);
+  clients.add(oPlayer);
+  const joinedX = waitForMessage(xPlayer, message => message.type === "state" && message.players.O);
+  const joinedO = await sendAndWait(
+    oPlayer,
+    { type: "join", roomCode: created.roomCode, token: crypto.randomUUID() },
+    message => message.type === "state"
+  );
+  await joinedX;
+  assert.equal(joinedO.playerMark, "O");
+
+  const drawMoves = [
+    [xPlayer, 0], [oPlayer, 1], [xPlayer, 2],
+    [oPlayer, 4], [xPlayer, 3], [oPlayer, 5],
+    [xPlayer, 7], [oPlayer, 6], [xPlayer, 8]
+  ];
+  let finalXState;
+  let finalOState;
+  for (const [client, index] of drawMoves) {
+    const xState = waitForMessage(xPlayer, message => message.type === "state");
+    const oState = waitForMessage(oPlayer, message => message.type === "state");
+    client.send(JSON.stringify({ type: "move", index }));
+    [finalXState, finalOState] = await Promise.all([xState, oState]);
+  }
+  assert.equal(finalXState.gameOver, true);
+  assert.equal(finalXState.winner, null);
+
+  const nextXState = waitForMessage(xPlayer, message => message.type === "state");
+  const nextOState = sendAndWait(
+    oPlayer,
+    { type: "reset" },
+    message => message.type === "state"
+  );
+  const [xNext, oNext] = await Promise.all([nextXState, nextOState]);
+  assert.equal(xNext.currentPlayer, "O");
+  assert.equal(oNext.currentPlayer, "O");
 });

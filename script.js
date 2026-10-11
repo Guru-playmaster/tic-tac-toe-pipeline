@@ -193,7 +193,7 @@
     lobby.hidden = true;
     roomPanel.hidden = false;
     reconnectButton.hidden = true;
-    resetButton.hidden = false;
+    resetButton.hidden = !state.gameOver;
     roomCodeText.textContent = state.roomCode;
     const opponentsConnected = state.players[state.playerMark === "X" ? "O" : "X"];
     playerInfo.textContent = `You are Player ${state.playerMark}. ${opponentsConnected ? "Both players are connected." : "Waiting for the other player..."}`;

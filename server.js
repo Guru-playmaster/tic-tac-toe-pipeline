@@ -200,8 +200,14 @@ function createGameServer(options = {}) {
       }
 
       if (message.type === "reset") {
+        if (!room.gameOver) {
+          sendError(socket, "Finish the current game before starting another.");
+          return;
+        }
+        room.startingPlayer = room.winner ||
+          (room.startingPlayer === "X" ? "O" : "X");
         room.board = Array(9).fill("");
-        room.currentPlayer = "X";
+        room.currentPlayer = room.startingPlayer;
         room.winner = null;
         room.gameOver = false;
         broadcastState(room);
@@ -256,6 +262,7 @@ function createRoom(rooms) {
     code,
     board: Array(9).fill(""),
     currentPlayer: "X",
+    startingPlayer: "X",
     winner: null,
     gameOver: false,
     players: new Map(),
