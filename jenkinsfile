@@ -67,7 +67,7 @@ IMAGE="tic-tac-toe:$BUILD_ID"
 cd "$DEPLOY_DIR"
 tar -xzf source.tar.gz
 
-docker build -t "$IMAGE" .
+docker build -f dockerfile -t "$IMAGE" .
 
 # Remove the manual test container if you started it earlier.
 docker rm -f tictac-web-manual 2>/dev/null || true
