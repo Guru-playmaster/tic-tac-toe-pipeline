@@ -183,3 +183,8 @@
       .game { padding: 22px 18px; }
       .join-row { grid-template-columns: 1fr; }
     }
+
+    .mode-picker { display: flex; gap: 9px; margin-bottom: 18px; }
+    .mode-picker button { flex: 1; border: 2px solid transparent; }
+    .mode-picker button[aria-pressed="true"] { border-color: #8c9dff; background: #101d7c; }
+    #computer-info { margin: 0 0 17px; }

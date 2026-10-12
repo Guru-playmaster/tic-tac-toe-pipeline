@@ -12,6 +12,17 @@
   const playerInfo = document.querySelector("#player-info");
   const copyInviteButton = document.querySelector("#copy-invite");
   const reconnectButton = document.querySelector("#reconnect");
+  const roomModeButton = document.querySelector("#mode-room");
+  const computerModeButton = document.querySelector("#mode-computer");
+  const computerInfo = document.querySelector("#computer-info");
+  const helpText = document.querySelector("#help");
+  const roomHelp = helpText.textContent;
+  const winningLines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6],
+    [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]
+  ];
+  let mode = "room";
+  let computerTimer = null;
   const storageKey = "tic-tac-toe-online-room";
 
   let socket = null;
@@ -20,6 +31,109 @@
   let playerToken = null;
   let connected = false;
   let expectedRoomCode = null;
+
+  function evaluateBoard(board) {
+    const winningLine = winningLines.find(line =>
+      board[line[0]] && line.every(index => board[index] === board[line[0]])
+    ) || null;
+    return {
+      winningLine,
+      winner: winningLine ? board[winningLine[0]] : null,
+      gameOver: Boolean(winningLine) || board.every(Boolean)
+    };
+  }
+
+  function bestComputerMove(board) {
+    function score(turn, depth) {
+      const result = evaluateBoard(board);
+      if (result.winner) return result.winner === "O" ? 10 - depth : depth - 10;
+      if (result.gameOver) return 0;
+      const scores = [];
+      board.forEach((mark, index) => {
+        if (mark) return;
+        board[index] = turn;
+        scores.push(score(turn === "O" ? "X" : "O", depth + 1));
+        board[index] = "";
+      });
+      return turn === "O" ? Math.max(...scores) : Math.min(...scores);
+    }
+    let best = -Infinity;
+    let move = null;
+    for (const index of [4, 0, 2, 6, 8, 1, 3, 5, 7]) {
+      if (board[index]) continue;
+      board[index] = "O";
+      const value = score("X", 0);
+      board[index] = "";
+      if (value > best) { best = value; move = index; }
+    }
+    return move;
+  }
+
+  function startComputerGame() {
+    clearTimeout(computerTimer);
+    gameState = {
+      board: Array(9).fill(""), currentPlayer: "X", playerMark: "X",
+      winner: null, winningLine: null, gameOver: false, players: { X: true, O: true }
+    };
+    renderGame();
+  }
+
+  function selectMode(nextMode) {
+    clearTimeout(computerTimer);
+    const oldSocket = socket;
+    socket = null;
+    if (oldSocket) oldSocket.close();
+    connected = false;
+    gameState = null;
+    mode = nextMode;
+    roomModeButton.setAttribute("aria-pressed", String(mode === "room"));
+    computerModeButton.setAttribute("aria-pressed", String(mode === "computer"));
+    computerInfo.hidden = mode !== "computer";
+    roomPanel.hidden = true;
+    reconnectButton.hidden = true;
+    resetButton.hidden = true;
+    resetButton.disabled = false;
+    setLobbyEnabled(true);
+    helpText.textContent = mode === "computer"
+      ? "Choose an empty square. The computer responds automatically. No room or connection needed."
+      : roomHelp;
+    if (mode === "computer") {
+      startComputerGame();
+    } else {
+      lobby.hidden = false;
+      cells.forEach(cell => {
+        cell.textContent = "";
+        cell.classList.remove("x", "o", "winning");
+      });
+      lockBoard();
+      setStatus("Create a room or join with a room code.");
+    }
+  }
+
+  function playComputerMove(index) {
+    if (mode !== "computer" || !gameState || gameState.gameOver ||
+        gameState.currentPlayer !== "X" || gameState.board[index]) return;
+    gameState.board[index] = "X";
+    Object.assign(gameState, evaluateBoard(gameState.board));
+    if (!gameState.gameOver) gameState.currentPlayer = "O";
+    renderGame();
+    if (gameState.gameOver) return;
+    computerTimer = setTimeout(() => {
+      if (mode !== "computer" || !gameState || gameState.gameOver) return;
+      const move = bestComputerMove(gameState.board);
+      if (move !== null) gameState.board[move] = "O";
+      Object.assign(gameState, evaluateBoard(gameState.board));
+      gameState.currentPlayer = "X";
+      renderGame();
+    }, 350);
+  }
+
+  roomModeButton.addEventListener("click", () => {
+    if (mode !== "room" || socket) selectMode("room");
+  });
+  computerModeButton.addEventListener("click", () => {
+    if (mode !== "computer") selectMode("computer");
+  });
 
   function setStatus(message) {
     statusText.textContent = message;
@@ -191,7 +305,7 @@
 
     connected = true;
     lobby.hidden = true;
-    roomPanel.hidden = false;
+    roomPanel.hidden = mode !== "room";
     reconnectButton.hidden = true;
     resetButton.hidden = !state.gameOver;
     roomCodeText.textContent = state.roomCode;
@@ -216,6 +330,12 @@
         Boolean(mark);
     });
 
+    if (mode === "computer") {
+      if (state.winner) setStatus(state.winner === "X" ? "You win!" : "Computer wins!");
+      else if (state.gameOver) setStatus("It's a draw!");
+      else setStatus(state.currentPlayer === "X" ? "Your turn (X)" : "Computer is thinking...");
+      return;
+    }
     if (state.winner) {
       setStatus(`Player ${state.winner} wins!`);
     } else if (state.gameOver) {
@@ -223,7 +343,7 @@
     } else if (!opponentsConnected) {
       setStatus("Waiting for the other player to join...");
     } else if (state.currentPlayer === state.playerMark) {
-      setStatus(`Player ${state.playerMark}'s turn — your move`);
+      setStatus(`Player ${state.playerMark}'s turn â€” your move`);
     } else {
       setStatus(`Player ${state.currentPlayer}'s turn`);
     }
@@ -264,10 +384,10 @@
   });
 
   cells.forEach((cell, index) => {
-    cell.addEventListener("click", () => sendMessage({ type: "move", index }));
+    cell.addEventListener("click", () => mode === "computer" ? playComputerMove(index) : sendMessage({ type: "move", index }));
   });
 
-  resetButton.addEventListener("click", () => sendMessage({ type: "reset" }));
+  resetButton.addEventListener("click", () => mode === "computer" ? startComputerGame() : sendMessage({ type: "reset" }));
 
   reconnectButton.addEventListener("click", () => {
     if (savedRoom) {

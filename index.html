@@ -9,8 +9,14 @@
 <body>
   <main class="game">
     <h1>Tic-Tac-Toe</h1>
-    <p class="subtitle">Play online with someone anywhere</p>
+    <p class="subtitle">Play with a friend or challenge the computer</p>
     <p class="status" id="status" aria-live="polite">Create a room or join with a room code.</p>
+
+    <div class="mode-picker" role="group" aria-label="Game mode">
+      <button class="action" id="mode-room" type="button" aria-pressed="true">2 players / room</button>
+      <button class="action" id="mode-computer" type="button" aria-pressed="false">Play computer</button>
+    </div>
+    <p class="player-info" id="computer-info" hidden>You are X. The computer plays O.</p>
 
     <section class="lobby" id="lobby" aria-label="Online game setup">
       <label for="server-url">Game server URL</label>
@@ -45,7 +51,7 @@
       <button class="cell" type="button" aria-label="Row 3, column 3"></button>
     </section>
     <button class="reset" id="reset" type="button" hidden>Play again</button>
-    <p class="help">Share the invite link, or open this page on another origin and enter the same server URL and room code.</p>
+    <p class="help" id="help">Share the invite link, or open this page on another origin and enter the same server URL and room code.</p>
   </main>
 
   <script src="script.js"></script>
