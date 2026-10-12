@@ -289,3 +289,48 @@ test("alternates the starting player after a draw", async t => {
   assert.equal(xNext.currentPlayer, "O");
   assert.equal(oNext.currentPlayer, "O");
 });
+
+test("pauses room actions until both players connect and resumes after reconnect", async t => {
+  const app = createGameServer();
+  const clients = new Set();
+  app.server.listen(0, "127.0.0.1");
+  await once(app.server, "listening");
+  const url = `ws://127.0.0.1:${app.server.address().port}/ws`;
+  t.after(async () => {
+    clearInterval(app.cleanupTimer);
+    for (const client of clients) client.terminate();
+    await new Promise(resolve => app.server.close(resolve));
+  });
+  const x = await connect(url); clients.add(x);
+  const created = await sendAndWait(x, { type: "create", token: crypto.randomUUID() });
+  const room = app.rooms.get(created.roomCode);
+  for (const action of [{ type: "move", index: 0 }, { type: "reset" }]) {
+    const error = await sendAndWait(x, action);
+    assert.equal(error.type, "error");
+    assert.match(error.message, /both players/);
+    assert.deepEqual(room.board, Array(9).fill(""));
+  }
+  const o = await connect(url); clients.add(o);
+  const oToken = crypto.randomUUID();
+  const xJoined = waitForMessage(x, state => state.type === "state" && state.players.O);
+  await sendAndWait(o, { type: "join", roomCode: created.roomCode, token: oToken });
+  await xJoined;
+  const disconnected = waitForMessage(x, state => state.type === "state" && !state.players.O);
+  o.close(); await disconnected;
+  const error = await sendAndWait(x, { type: "move", index: 0 });
+  assert.match(error.message, /both players/);
+  assert.deepEqual(room.board, Array(9).fill(""));
+  // A finished round cannot be reset while a participant is disconnected either.
+  room.gameOver = true;
+  const resetError = await sendAndWait(x, { type: "reset" });
+  assert.match(resetError.message, /both players/);
+  assert.equal(room.gameOver, true);
+  room.gameOver = false;
+  const restoredO = await connect(url); clients.add(restoredO);
+  const restoredX = waitForMessage(x, state => state.type === "state" && state.players.O);
+  await sendAndWait(restoredO, { type: "join", roomCode: created.roomCode, token: oToken });
+  await restoredX;
+  const moved = await sendAndWait(x, { type: "move", index: 0 });
+  assert.equal(moved.board[0], "X");
+  assert.equal(moved.currentPlayer, "O");
+});

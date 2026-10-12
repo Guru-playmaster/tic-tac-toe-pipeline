@@ -165,6 +165,14 @@ function createGameServer(options = {}) {
       }
       room.updatedAt = Date.now();
 
+      if (["move", "reset"].includes(message.type) && (
+        room.players.size !== 2 ||
+        [...room.players.values()].some(participant => participant.socket?.readyState !== WebSocket.OPEN)
+      )) {
+        sendError(socket, "Wait for both players to connect before playing.");
+        return;
+      }
+
       if (message.type === "move") {
         if (
           !Number.isInteger(message.index) ||

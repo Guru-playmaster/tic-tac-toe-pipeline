@@ -1,8 +1,10 @@
 # Tic-Tac-Toe
 
-Choose **Play computer** for an offline game (you play X, the computer plays O), or **2 players / room** to create or join an online room. The computer uses optimal moves. Use **Play again** after a result. Switching modes clears the board and disconnects the current room; you can rejoin using its code.
+Choose **Play computer** for an offline game (you play X, the computer plays O), or **2 players / room** to create or join an online room. The computer varies its choices and sometimes experiments early in a round, giving you opportunities to win. It still takes immediate wins and blocks direct threats. There is one computer mode, with no difficulty selector. Use **Play again** after a result. Switching modes clears the board and disconnects the current room; you can rejoin using its code.
 
 Players can join the same six-character room from separate browsers or origins. The Node.js server serves the page and owns the room state; moves are shared over WebSockets and checked by the server.
+
+Online moves and replay pause until both players are connected. A disconnected player can use **Reconnect** to resume the room.
 
 After a win, the winning three squares are highlighted and the winner starts the next round. After a draw, the starting player alternates.
 

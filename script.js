@@ -43,7 +43,7 @@
     };
   }
 
-  function bestComputerMove(board) {
+  function bestComputerMove(board, random = () => 0) {
     function score(turn, depth) {
       const result = evaluateBoard(board);
       if (result.winner) return result.winner === "O" ? 10 - depth : depth - 10;
@@ -58,15 +58,38 @@
       return turn === "O" ? Math.max(...scores) : Math.min(...scores);
     }
     let best = -Infinity;
-    let move = null;
+    let moves = [];
     for (const index of [4, 0, 2, 6, 8, 1, 3, 5, 7]) {
       if (board[index]) continue;
       board[index] = "O";
       const value = score("X", 0);
       board[index] = "";
-      if (value > best) { best = value; move = index; }
+      if (value > best) { best = value; moves = [index]; }
+      else if (value === best) moves.push(index);
     }
-    return move;
+    return moves.length ? moves[Math.floor(random() * moves.length)] : null;
+  }
+
+  function chooseComputerMove(board, random = Math.random) {
+    if (evaluateBoard(board).gameOver) return null;
+    const available = board.map((mark, index) => mark ? null : index)
+      .filter(index => index !== null);
+    // Take a win or stop an immediate loss before trying a different strategy.
+    for (const mark of ["O", "X"]) {
+      const threats = available.filter(index => {
+        board[index] = mark;
+        const wins = evaluateBoard(board).winner === mark;
+        board[index] = "";
+        return wins;
+      });
+      if (threats.length) return threats[Math.floor(random() * threats.length)];
+    }
+    // Sometimes experiment early in the round. These choices can leave a fork
+    // for an observant player, rather than forcing every well-played game to draw.
+    if (board.filter(mark => mark === "O").length < 2 && random() < 0.35) {
+      return available[Math.floor(random() * available.length)];
+    }
+    return bestComputerMove(board, random);
   }
 
   function startComputerGame() {
@@ -101,7 +124,8 @@
       startComputerGame();
     } else {
       lobby.hidden = false;
-      cells.forEach(cell => {
+      cells.forEach((cell, index) => {
+        cell.setAttribute("aria-label", `Row ${Math.floor(index / 3) + 1}, column ${(index % 3) + 1}`);
         cell.textContent = "";
         cell.classList.remove("x", "o", "winning");
       });
@@ -120,7 +144,7 @@
     if (gameState.gameOver) return;
     computerTimer = setTimeout(() => {
       if (mode !== "computer" || !gameState || gameState.gameOver) return;
-      const move = bestComputerMove(gameState.board);
+      const move = chooseComputerMove(gameState.board);
       if (move !== null) gameState.board[move] = "O";
       Object.assign(gameState, evaluateBoard(gameState.board));
       gameState.currentPlayer = "X";
@@ -202,16 +226,13 @@
   }
 
   function lockBoard() {
+    resetButton.disabled = true;
     cells.forEach(cell => {
       cell.disabled = true;
     });
   }
 
   function connectToRoom(action, roomCode, token) {
-    if (socket && socket.readyState !== WebSocket.CLOSED) {
-      socket.close();
-    }
-
     let serverUrl;
     try {
       serverUrl = getServerAddress();
@@ -223,6 +244,14 @@
     const websocketUrl = new URL(serverUrl);
     websocketUrl.protocol = serverUrl.protocol === "https:" ? "wss:" : "ws:";
     websocketUrl.pathname = "/ws";
+    let activeSocket;
+    try {
+      activeSocket = new WebSocket(websocketUrl);
+    } catch {
+      setStatus("Could not connect. Check the server URL and try again.");
+      return;
+    }
+    if (socket && socket.readyState !== WebSocket.CLOSED) socket.close();
 
     playerToken = token;
     expectedRoomCode = roomCode || null;
@@ -230,13 +259,14 @@
     connected = false;
     lobby.hidden = true;
     roomPanel.hidden = false;
+    roomCodeText.textContent = "";
+    playerInfo.textContent = "Connecting...";
     reconnectButton.hidden = true;
     resetButton.hidden = true;
     lockBoard();
     setLobbyEnabled(false);
     setStatus("Connecting to the game server...");
 
-    const activeSocket = new WebSocket(websocketUrl);
     let connectionError = null;
     socket = activeSocket;
 
@@ -260,6 +290,7 @@
 
       if (message.type === "error") {
         connectionError = message.message;
+        if (gameState) renderGame();
         setStatus(message.message);
         if (!gameState) {
           activeSocket.close();
@@ -310,6 +341,7 @@
     resetButton.hidden = !state.gameOver;
     roomCodeText.textContent = state.roomCode;
     const opponentsConnected = state.players[state.playerMark === "X" ? "O" : "X"];
+    resetButton.disabled = mode === "room" && !opponentsConnected;
     playerInfo.textContent = `You are Player ${state.playerMark}. ${opponentsConnected ? "Both players are connected." : "Waiting for the other player..."}`;
 
     state.board.forEach((mark, index) => {
@@ -343,7 +375,7 @@
     } else if (!opponentsConnected) {
       setStatus("Waiting for the other player to join...");
     } else if (state.currentPlayer === state.playerMark) {
-      setStatus(`Player ${state.playerMark}'s turn â€” your move`);
+      setStatus(`Player ${state.playerMark}'s turn - your move`);
     } else {
       setStatus(`Player ${state.currentPlayer}'s turn`);
     }
@@ -354,6 +386,8 @@
       setStatus("You are not connected to the game server.");
       return;
     }
+    if (message.type === "move") lockBoard();
+    if (message.type === "reset") resetButton.disabled = true;
     socket.send(JSON.stringify(message));
   }
 
